@@ -285,8 +285,8 @@ main{position:relative;z-index:2}
 
 <!-- 🎵 MUSIC: put your three mp3s in an "assets" folder next to this file -->
 <audio id="song1" src="assets/Nuwe.mp3" preload="auto" loop playsinline></audio> <!-- gift, balloons & cake -->
-<audio id="song2" src="assets/song2.mp3" preload="auto" loop playsinline></audio> <!-- while reading -->
-<audio id="song3" src="assets/song3.mp3" preload="auto" loop playsinline></audio> <!-- finale, after "I read it" -->
+<audio id="song2" src="assets/song2.mp3" preload="none" loop playsinline></audio> <!-- while reading -->
+<audio id="song3" src="assets/song3.mp3" preload="none" loop playsinline></audio> <!-- finale, after "I read it" -->
 
 <div class="backdrop" id="backdrop"><div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div></div>
 <div class="grain"></div>
@@ -594,11 +594,14 @@ function initAudio(){
     if (!useGraph) el.volume = 0;
   }
   if (ctx && ctx.state === 'suspended') ctx.resume();
-  // quietly "unlock" song2 & song3 now so they can start later on any phone
-  [tracks.song2, tracks.song3].forEach(t => {
-    t.muted = true;
-    t.play().then(() => { if (nowTrack !== t.id){ t.pause(); t.currentTime = 0; } t.muted = !soundOn; }).catch(() => { t.muted = !soundOn; });
-  });
+}
+// Load a song in the background (silently) during a tap, so it's ready — and allowed to play — later.
+// Songs load one at a time instead of all at once, so the page never hangs.
+function prepare(id){
+  const t = tracks[id]; if (t._prepared) return; t._prepared = true;
+  t.preload = 'auto'; t.muted = true;
+  t.play().then(() => { if (nowTrack !== id){ t.pause(); t.currentTime = 0; } t.muted = !soundOn; })
+          .catch(() => { t.muted = !soundOn; });
 }
 function fadeTo(id, target, ms){
   const el = tracks[id];
@@ -704,6 +707,7 @@ function buildBalloons(){
 }
 function popBalloon(b, line){
   b.classList.add('popped'); sfxPop();
+  if (popped >= 2) prepare('song2');      // start loading the letter song early
   const r = b.getBoundingClientRect();
   confetti.burst(r.left + r.width/2, r.top + r.width*0.55, 26, 5);
   popped++;
@@ -725,6 +729,7 @@ function popBalloon(b, line){
 $('cakeBtn').addEventListener('click', () => {
   const flame = $('flame'); if (flame.classList.contains('out')) return;
   flame.classList.add('out');
+  prepare('song2');                       // start loading the letter song now
   document.querySelectorAll('.smoke').forEach(s => s.classList.add('go'));
   sfxChime(); if (navigator.vibrate) navigator.vibrate([20,40,20]);
   confetti.rain(160);
@@ -741,7 +746,8 @@ $('toEnvelope').addEventListener('click', () => go('s-env'));
 function openEnvelope(){
   const env = $('env'); if (env.classList.contains('open')) return;
   env.classList.add('open'); sfxChime();
-  playTrack('song2', 2600);                 // song1 fades out, song2 fades in
+  playTrack('song2', 2600);
+  prepare('song3');                         // start loading the finale song while she reads                 // song1 fades out, song2 fades in
   setTimeout(() => go('s-letter'), 1900);
 }
 $('env').addEventListener('click', openEnvelope);
@@ -780,6 +786,7 @@ function readTime(){
 }
 $('readBtn').addEventListener('click', () => {
   notify('read', `.⋆❀° Ciiru tapped "I read it" (${readTime()} on the letter)`, 'purple_heart,tada');
+  playTrack('song3', 2500);               // song2 fades out, song3 fades in
   go('s-final');
 });
 
@@ -787,7 +794,6 @@ $('readBtn').addEventListener('click', () => {
    5 · FINALE
 ═══════════════════════════════════════════ */
 function finale(){
-  playTrack('song3', 2500);               // song2 fades out, song3 fades in
   sfxChime();
   confetti.rain(220);
   for (let i = 0; i < 9; i++){
